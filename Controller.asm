@@ -12,6 +12,8 @@
 	STATE		DS	3	; variable for state ColorLight:ProxLight1:ProxLight2
        PAUSED		DW	1	;
         ABORT		DW	0	;
+       ETIMER		DW	0	; variable for the empty detector
+        EMPTY		DW	1	; boolean for empty
 
 
 @CODE
@@ -26,16 +28,22 @@
 	ADCONVS		EQU	6	; the outputs, concatenated, of the 2 A/D-converters
 	
 	; Button and Detector values
-	START		EQU	%00000001	; location of the Start/Stop button
-	ABORT		EQU	%00000010	; location of the Abort button
-	   S1		EQU	%00001000	; location of S1
-	   S2		EQU	%00010000	; location of S2
-	PROX1		EQU	%00100000	; location of PROX1
-	PROX2		EQU	%01000000	; location of PROX2
+	START		EQU	%000000001	; location of the Start/Stop button
+	ABORT		EQU	%000000010	; location of the Abort button
+	   S1		EQU	%000001000	; location of S1
+	   S2		EQU	%000010000	; location of S2
+	PROXB		EQU	%000100000	; location of PROXB
+	PROXW		EQU	%001000000	; location of PROXW
+	PROXE		EQU	%010000000	; location of PROXE
+	
+	LPROX		EQU	%0011
+       LCOLOR		EQU	%0100
 	
       MOTORCW		EQU	%010
      MOTORCCW		EQU	%001
      MOTOROFF		EQU	%000
+     
+        ETIME		EQU	165		; 6 ms marge van 1590
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Timer Interrupt Enable	;
@@ -49,19 +57,24 @@ EnableInterrupt:
 	STOR		R0		[R1]			; Save R0 in the address of R1
 	SETI		8					; Enable the interrupt service routine
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Initialization		;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 	LOAD		R5		IO_AREA			; Load the base I/O address
 	LOAD		R0		[GB+DELTA]		; Set R0 := DELTA
 	SUB		R0		[R5+TIMER]		; R0 := -TIMER
 	STOR		R0		[R5+TIMER]		; TIMER := TIMER+R0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Initialization		;
+;	States			;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Off:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
-	STOR		MOTORCW		[GB+MOTOR]
+	LOAD		R2		MOTORCW
+	STOR		R2		[GB+MOTOR]
 	
 	
 ToIdle:
@@ -102,26 +115,85 @@ ToIdle2:
 IdleFill:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
-	STOR		MOTOROFF	[GB+MOTOR]
+	LOAD		R2		MOTOROFF
+	STOR		R2		[GB+MOTOR]
 	 BRS		StopButtonCheck
 	LOAD		R1		[GB+STOPBUT]
 	 AND		R0		START
 	 BNE		IdleFill
 	LOAD		R4		0
 	STOR		R4		[GB+PAUSED]
+	LOAD		R2		MOTORCW
+	STOR 		R2		[GB+MOTOR]
 	 BEQ		IdleCheck
 	 
+IdleCheck:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	 BRS		ButtonCheck
+	LOAD		R1		[GB+CURBUT]
+	 AND		R1		S1
+	 BEQ		Idle
+	 BRA		IdleCheck
+	 
 Idle:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	LOAD		R2		MOTOROFF
+	STOR		R2		[GB+MOTOR]
+	LOAD		R4		[GB+PAUSED]
+	 BEQ		IdlePausedInit
+	 BRA		Scanning
+	 
+IdlePausedInit:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	 BRS		EmptyCheck
+	LOAD		R4		[GB+EMPTY]
+	 BEQ		IdlePaused
+	LOAD		R2		MOTORCW
+	STOR		R2		[GB+MOTOR]
+	 BRA		ToIdle1
+	 
+IdlePaused:
+	 BRS		StopButtonCheck
+	LOAD		R1		[GB+STOPBUT]
+	 AND		R1		START
+	 BNE		Scanning
+	 BRA		IdlePause
+
+Scanning:
 	
 
-
-
-
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	ButtonChecks		;
+;	Additional Checks	;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+EmptyCheck:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	LOAD		R0		ETIME
+	STOR		R0		[GB+ETIMER]
+	LOAD		R1		%100
+	STOR		R1		[GB+STATE]
+	
+EmptyCheckLoop:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	LOAD		R0		[GB+ETIMER]
+	 BNE		EmptyCheckLoop
+	 
+EmptyCheckFinish:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	LOAD		R2		[R5+OUTPUT]
+	 AND		R2		PROXE
+	 MOD		R2		PROXE
+	STOR		R2		[GB+EMPTY]
+	 RTS
+	 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Button Checks		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 StopButtonCheck:
@@ -138,12 +210,12 @@ ButtonCheck:
 	LOAD		R0		[R5+INPUT]
 	 XOR		R3		%011111111
 	 AND		R3		R0
-	STOR		R3		[GB+CURBUF]
+	STOR		R3		[GB+CURBUT]
 	STOR		R0		[GB+BUTBUF]
 	 RTS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Abort and Pause check	;
+;	Abort and Pause Check	;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 AbortCheck:
@@ -174,5 +246,7 @@ StopReturn:
 TimerISR:
 	BRS		AbortCheck
 	BRS		StopCheck
+	
+	
 
 @END
