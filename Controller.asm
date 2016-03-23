@@ -1,19 +1,18 @@
 @DATA
-						; colorDet 168 for black
+
 	 CODE		DS	1		; variable where CODE location is saved
        BUTBUF		DW	0		; the previous button input
        CURBUT		DW	0		;
       STOPBUF		DW	0		; the previous stop button input
       STOPBUT		DW	0		;
-	DELTA		DW	10		; value for timer delay
+	DELTA		DW	1		; value for timer delay
 	 STEP		DW	0		; current step, for PWM
-	  PWM		DW	40		; max value for PWM
+	  PWM		DW	3		; max value for PWM
 	MOTOR		DS	1		; variable for motor state
-	STATE		DS	3		; variable for state ColorLight:ProxLight1:ProxLight2
+	STATE		DS	3		; variable for state ColorLight:ProxLightW:ProxLightB
        PAUSED		DW	1		;
         ABORT		DW	0		;
-       ETIMER		DW	0		; variable for the empty detector
-        EMPTY		DW	1		; boolean for empty
+       LTIMER		DW	0		; variable for the empty detector
 
 
 @CODE
@@ -36,8 +35,10 @@
 	PROXW		EQU	%001000000	; location of PROXW
 	PROXE		EQU	%010000000	; location of PROXE
 	
-	LPROX		EQU	%0011
-       LCOLOR		EQU	%0100
+       LCOLOR		EQU	2
+       LPROXW		EQU	1
+       LPROXB		EQU	0
+	
 	
       MOTORCW		EQU	%010
      MOTORCCW		EQU	%001
@@ -46,7 +47,8 @@
      	   ON		EQU	%01
      	  OFF		EQU	%00
       
-        ETIME		EQU	170		; 11 ms marge van 1590
+        BLACK		EQU	%010101000	; colordet 168 for black
+        ETIME		EQU	1700		; 11 ms marge van 1590
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Timer Interrupt Enable	;
@@ -78,7 +80,6 @@ Off:
 	 BNE		Abort
 	LOAD		R2		MOTORCW
 	STOR		R2		[GB+MOTOR]
-	
 	
 ToIdle:
 	LOAD		R4		[GB+ABORT]
@@ -128,8 +129,13 @@ IdleFill:
 	STOR		R4		[GB+PAUSED]
 	LOAD		R2		MOTORCW
 	STOR 		R2		[GB+MOTOR]
-	 BEQ		IdleCheck
+	 BEQ		IdleCheckInit:
 	 
+IdleCheckInit:
+	LOAD		R2		ON
+	STOR		R2		[GB+STATE+LPROXB]
+	STOR		R2		[GB+STATE+LPROXW]
+
 IdleCheck:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
@@ -137,11 +143,15 @@ IdleCheck:
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S1
 	 BEQ		Idle
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S2			; Check if S2 is high
+	 BEQ		Abort					; If it is, abort
 	 BRA		IdleCheck
 	 
 Idle:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
+	LOAD		R2
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
 	LOAD		R4		[GB+PAUSED]
@@ -152,8 +162,8 @@ IdlePausedInit:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
 	 BRS		LightSwitch
-	
-	LOAD		R4		[GB+EMPTY]
+	LOAD		R1		[R5+INPUT]
+	 AND		R1		PROXE
 	 BEQ		IdlePaused
 	LOAD		R2		MOTORCW
 	STOR		R2		[GB+MOTOR]
@@ -169,10 +179,118 @@ IdlePaused:
 	 BRA		IdlePause
 
 Scanning:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	 BRS		LightSwitch
+	LOAD		R1		[R5+INPUT]
+	 AND		R1		PROXE
+	 BEQ		Finished
+	LOAD		R1		[R5+ADCONVS]
+	DVMD		R1		256
+	 CMP		R2		BLACK
+	 BPL		TurnBlack
+	 BRA		TurnWhite
+
+TurnBlack:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R2		MOTORCW			; Load the CW value
+	STOR		R2		[GB+MOTOR]		; Make the motor rotate CW
+	LOAD		R2		ON			; Load the on variable
+	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
+	STOR		R2		[GB+STATE+LPROXW]
+	
+TurnBlack1:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	 BRS		ButtonCheck				; Get the button state
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXB			; See if PROXB is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXW			; See if PROXW is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S1			; Check if S1 is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S2			; Check if S2 is high
+	 BEQ		TurnBlack2				; If it is, go to TurnBlack2
+	 BRA		TurnBlack1
+	
+TurnBlack2:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	 BRS		ButtonCheck				; Get the button state
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXB			; See if PROXB is high
+	 BEQ		IdleCheck				; If it is, go to IdleCheck
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXW			; See if PROXB is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S1			; Check if S1 is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S2			; Check if S2 is high
+	 BEQ		Abort					; If it is, abort
+	 BRA		TurnBlack2				; Return to the idle check where everything is disabled
+
+TurnWhite:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R2		MOTORCCW		; Load the CCW value
+	STOR		R2		[GB+MOTOR]		; Make the motor rotate CW
+	LOAD		R2		ON			; Load the on variable
+	STOR		R2		[GB+STATE+LPROXB]	; Set the PROXB light to be ON
+	STOR		R2		[GB+STATE+LPROXW]
+	
+TurnWhite1:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	 BRS		ButtonCheck				; Get the button state
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXB			; See if PROXB is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXW			; See if PROXW is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S1			; Check if S1 is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S2			; Check if S2 is high
+	 BEQ		TurnWhite2				; While it isn't, keep turning
+	 BRA		TurnWhite1
+	
+TurnWhite2:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	 BRS		ButtonCheck				; Get the button state
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXB			; See if PROXB is high
+	 BEQ		Abort					; While it isn't high, keep checking
+	LOAD		R1		[GB+CURBUT]		; Get the input values
+	 AND		R1		PROXW			; See if PROXB is high
+	 BEQ		IdleCheck				; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S1			; Check if S1 is high
+	 BEQ		Abort					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S2			; Check if S2 is high
+	 BEQ		Abort					; If it is, abort
+	 BRA		TurnWhite2				; Return to the idle check where everything is disabled
+
+Finished:
+	LOAD		R4		[GB+ABORT]
+	 BNE		Abort
+	LOAD		R2		MOTORCW
+	STOR		R2		[GB+MOTOR]
+	 BRA		ToIdle1
 	
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Additional Checks	;
+;	LightSwitch		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 LightSwitch:
@@ -180,8 +298,8 @@ LightSwitch:
 	 BNE		LightSwitchDone
 	LOAD		R0		ETIME
 	STOR		R0		[GB+ETIMER]
-	LOAD		R1		ON
-	STOR		R1		[GB+STATE+2]
+	LOAD		R2		ON
+	STOR		R2		[GB+STATE+LCOLOR]
 	
 LightSwitchLoop:
 	LOAD		R4		[GB+ABORT]
@@ -192,8 +310,8 @@ LightSwitchLoop:
 LightSwitchFinish:
 	LOAD		R4		[GB+ABORT]
 	 BNE		LightSwitchDone
-	LOAD		R1		OFF
-	STOR		R1		[GB+STATE+2]
+	LOAD		R2		OFF
+	STOR		R2		[GB+STATE+LCOLOR]
 	
 LightSwitchDone:
 	 RTS
@@ -219,6 +337,9 @@ ButtonCheck:
 	STOR		R3		[GB+CURBUT]
 	STOR		R0		[GB+BUTBUF]
 	 RTS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Timer Interupt Subs	;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Abort and Pause Check	;
@@ -246,13 +367,60 @@ StopReturn:
 	 RTS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	LightTimer		;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+LightTimerDecrease:
+	LOAD		R0		[GB+ETIMER]
+	 SUB		R0		1
+	STOR		R0		[GB+ETIMER]
+	 RTS
+	 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Output			;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Output:
+	LOAD		R1		[GB+STATE]
+
+MotorCheck:
+	LOAD		R0		[GB+STEP]
+	 CMP		R0		[GB+PWM]
+	 BGT		MotorOff
+	 BRA		MotorOn
+	  
+MotorOff:
+	LOAD		R2		MOTOROFF
+	 BRA		Motor
+
+MotorOn:
+	LOAD		R2		[GB+MOTOR]
+
+Motor:
+	MULS		R2		%010000
+	  OR		R1		R2
+
+Step:
+	 MOD		R0		4
+	 ADD		R0		1
+	STOR		R0		[GB+STEP]
+	STOR		R1		[GB+OUTPUT]
+	 RTS
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Timer Interupt		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 TimerISR:
-	BRS		AbortCheck
-	BRS		StopCheck
+	 BRS		AbortCheck
+	 BRS		StopCheck
+	 BRS		LightTimerDecrease
+	 BRS		Output
 	
+	LOAD		R0		[GB+DELTA]
+	STOR		R0		[R5+TIMER]
+	SETI		8
+	 RTE
 	
 
 @END
