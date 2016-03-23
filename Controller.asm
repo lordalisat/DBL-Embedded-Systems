@@ -7,7 +7,7 @@
 	DELTA		DW	1		; value for timer delay
 	 STEP		DW	0		; current step, for PWM
 	  PWM		DW	3		; max value for PWM
-	MOTOR		DS	1		; variable for motor state
+	MOTOR		DS	2		; variable for motor state
 	STATE		DS	3		; variable for state ColorLight:ProxLightW:ProxLightB
        PAUSED		DW	1		;
         ABORT		DW	0		;
@@ -54,7 +54,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 EnableInterrupt:
-	LOAD		R0		TMR_ISR			; Store the address of the ISR part in R0
+	LOAD		R0		TimerISR		; Store the address of the ISR part in R0
 	ADD		R0		R5			; Add datapath to the code
 	LOAD		R1		16			; Set R1 := 16
 	STOR		R0		[R1]			; Save R0 in the address of R1
@@ -80,7 +80,7 @@ Off:
 	 BNE		Abort
 	LOAD		R2		MOTORCW
 	STOR		R2		[GB+MOTOR]
-	
+
 ToIdle:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
@@ -431,7 +431,7 @@ Step:
 ;	Timer Interupt		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-TMR_ISR:
+TimerISR:
 	 BRS		AbortCheck
 	 BRS		StopCheck
 	 BRS		LightTimerDecrease
