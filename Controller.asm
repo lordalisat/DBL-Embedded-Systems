@@ -1,6 +1,5 @@
 @DATA
 
-	 CODE		DS	1		; variable where CODE location is saved
        BUTBUF		DW	0		; the previous button input
        CURBUT		DW	0		;
       STOPBUF		DW	0		; the previous stop button input
@@ -17,18 +16,18 @@
 
 @CODE
 
-	IO_AREA		EQU	-16		; base address of the I/O-Area
-	TIMER		EQU	13		; timer register
-	OUTPUT		EQU	11		; the 8 outputs
-	LEDS		EQU	10		; the 3 LEDs above the 3 slide switches
-	DSPDIG		EQU	9		; register selecting the active display element
-	DSPSEG		EQU	8		; register for the pattern on the active display element
-	INPUT		EQU	7		; the 8 inputs
-	ADCONVS		EQU	6		; the outputs, concatenated, of the 2 A/D-converters
+      IO_AREA		EQU	-16		; base address of the I/O-Area
+        TIMER		EQU	13		; timer register
+       OUTPUT		EQU	11		; the 8 outputs
+	 LEDS		EQU	10		; the 3 LEDs above the 3 slide switches
+       DSPDIG		EQU	9		; register selecting the active display element
+       DSPSEG		EQU	8		; register for the pattern on the active display element
+        INPUT		EQU	7		; the 8 inputs
+      ADCONVS		EQU	6		; the outputs, concatenated, of the 2 A/D-converters
 	
 	; Button and Detector values
-	START		EQU	%000000001	; location of the Start/Stop button
-	ABORT		EQU	%000000010	; location of the Abort button
+       STARTB		EQU	%000000001	; location of the Start/Stop button
+       ABORTB		EQU	%000000010	; location of the Abort button
 	   S1		EQU	%000001000	; location of S1
 	   S2		EQU	%000010000	; location of S2
 	PROXB		EQU	%000100000	; location of PROXB
@@ -55,8 +54,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 EnableInterrupt:
-	STOR		R5		[GB+CODE]
-	LOAD		R0		TimerISR		; Store the address of the ISR part in R0
+	LOAD		R0		TMR_ISR			; Store the address of the ISR part in R0
 	ADD		R0		R5			; Add datapath to the code
 	LOAD		R1		16			; Set R1 := 16
 	STOR		R0		[R1]			; Save R0 in the address of R1
@@ -74,6 +72,8 @@ EnableInterrupt:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	States			;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 Off:
 	LOAD		R4		[GB+ABORT]
@@ -123,18 +123,19 @@ IdleFill:
 	STOR		R2		[GB+MOTOR]
 	 BRS		StopButtonCheck
 	LOAD		R1		[GB+STOPBUT]
-	 AND		R0		START
+	 AND		R0		STARTB
 	 BNE		IdleFill
 	LOAD		R4		0
 	STOR		R4		[GB+PAUSED]
 	LOAD		R2		MOTORCW
 	STOR 		R2		[GB+MOTOR]
-	 BEQ		IdleCheckInit:
+	 BEQ		IdleCheckInit
 	 
 IdleCheckInit:
 	LOAD		R2		ON
 	STOR		R2		[GB+STATE+LPROXB]
 	STOR		R2		[GB+STATE+LPROXW]
+
 
 IdleCheck:
 	LOAD		R4		[GB+ABORT]
@@ -151,7 +152,6 @@ IdleCheck:
 Idle:
 	LOAD		R4		[GB+ABORT]
 	 BNE		Abort
-	LOAD		R2
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
 	LOAD		R4		[GB+PAUSED]
@@ -174,9 +174,9 @@ IdlePaused:
 	 BNE		Abort
 	 BRS		StopButtonCheck
 	LOAD		R1		[GB+STOPBUT]
-	 AND		R1		START
+	 AND		R1		STARTB
 	 BNE		Scanning
-	 BRA		IdlePause
+	 BRA		IdlePaused
 
 Scanning:
 	LOAD		R4		[GB+ABORT]
@@ -288,6 +288,26 @@ Finished:
 	STOR		R2		[GB+MOTOR]
 	 BRA		ToIdle1
 	
+Abort:
+	LOAD		R0		OFF
+	STOR		R0		[GB+STATE+LPROXB]
+	STOR		R0		[GB+STATE+LPROXW]
+	STOR		R0		[GB+STATE+LCOLOR]
+	LOAD		R2		MOTOROFF
+	STOR		R2		[GB+MOTOR]
+	
+	 BRS		StopButtonCheck
+	LOAD		R1		[GB+STOPBUT]
+	 AND		R1		STARTB
+	 BNE		AbortContinue  
+	 BRA		Abort
+	
+AbortContinue:
+	LOAD		R4		0
+	STOR		R4		[GB+ABORT]
+	 BRA		Off
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	LightSwitch		;
@@ -297,14 +317,14 @@ LightSwitch:
 	LOAD		R4		[GB+ABORT]
 	 BNE		LightSwitchDone
 	LOAD		R0		ETIME
-	STOR		R0		[GB+ETIMER]
+	STOR		R0		[GB+LTIMER]
 	LOAD		R2		ON
 	STOR		R2		[GB+STATE+LCOLOR]
 	
 LightSwitchLoop:
 	LOAD		R4		[GB+ABORT]
 	 BNE		LightSwitchDone
-	LOAD		R0		[GB+ETIMER]
+	LOAD		R0		[GB+LTIMER]
 	 BNE		LightSwitchLoop
 	 
 LightSwitchFinish:
@@ -347,7 +367,7 @@ ButtonCheck:
 
 AbortCheck:
 	LOAD		R1		[R5+INPUT]
-	 AND		R1		ABORT
+	 AND		R1		ABORTB
 	 BNE		AbortReturn
 	LOAD		R4		1
 	STOR		R4		[GB+ABORT]
@@ -358,7 +378,7 @@ AbortReturn:
 StopCheck:
 	 BRS		StopButtonCheck
 	LOAD		R1		[GB+STOPBUT]
-	 AND		R1		START
+	 AND		R1		STARTB
 	 BNE		StopReturn
 	LOAD		R4		1
 	STOR		R4		[GB+PAUSED]
@@ -371,9 +391,9 @@ StopReturn:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 LightTimerDecrease:
-	LOAD		R0		[GB+ETIMER]
+	LOAD		R0		[GB+LTIMER]
 	 SUB		R0		1
-	STOR		R0		[GB+ETIMER]
+	STOR		R0		[GB+LTIMER]
 	 RTS
 	 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -411,7 +431,7 @@ Step:
 ;	Timer Interupt		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-TimerISR:
+TMR_ISR:
 	 BRS		AbortCheck
 	 BRS		StopCheck
 	 BRS		LightTimerDecrease
