@@ -229,6 +229,7 @@ IdleCheckInit:
 	LOAD		R2		ON			; Load the ON value
 	STOR		R2		[GB+STATE+LPROXB]	; Set the PROXB light to be ON
 	STOR		R2		[GB+STATE+LPROXW]	; Set the PROXW light to be ON
+	 BRS		LightSwitchProx
 
 IdleCheck:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -251,6 +252,9 @@ IdleCheck:
 Idle:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
+	LOAD		R0		OFF
+	STOR		R0		[GB+STATE+LPROXB]
+	STOR		R0		[GB+STATE+LPROXW]
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
 	LOAD		R4		[GB+PAUSED]
@@ -298,6 +302,7 @@ TurnBlack:
 	LOAD		R2		ON			; Load the on variable
 	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
 	STOR		R2		[GB+STATE+LPROXW]
+	 BRS		LightSwitchProx
 	
 TurnBlack1:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -343,6 +348,7 @@ TurnWhite:
 	LOAD		R2		ON			; Load the on variable
 	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
 	STOR		R2		[GB+STATE+LPROXW]
+	 BRS		LightSwitchProx
 	
 TurnWhite1:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -430,6 +436,26 @@ LightSwitchFinish:
 	
 LightSwitchDone:
 	 RTS							; Subrouting for turning the color detector light on, takes 1700 ticks to warm up
+
+LightSwitchProx:
+	LOAD		R4		[GB+ABORT]
+	 BNE		LightSwitchDone
+	LOAD		R0		ETIME
+	STOR		R0		[GB+LTIMER]
+	
+LightSwitchProxLoop:
+	LOAD		R4		[GB+ABORT]
+	 BNE		LightSwitchDone
+	LOAD		R0		[GB+LTIMER]
+	 BNE		LightSwitchLoop
+	 
+LightSwitchProxFinish:
+	LOAD		R4		[GB+ABORT]
+	 BNE		LightSwitchDone
+	
+LightSwitchProxDone:
+	 RTS							; Subrouting for turning the prox detector light on, takes 1700 ticks to warm up
+
 	 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Button Checks		;
