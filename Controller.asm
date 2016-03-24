@@ -1,14 +1,14 @@
 @DATA
 
-       BUTBUF		DS	8		; the previous button input
-       CURBUT		DS	8		;
-	DELTA		DW	1		; value for timer delay
+       BUTBUF		DS	1		; the previous button input
+       CURBUT		DS	1		;
+	DELTA		DW	10		; value for timer delay
 	 STEP		DW	0		; current step, for PWM
 	  PWM		DW	3		; max value for PWM
 	MOTOR		DS	1		; variable for motor state
 	STATE		DS	3		; variable for state ColorLight:ProxLightW:ProxLightB
        PAUSED		DW	1		;
-        ABORT		DW	1		;
+        ABORT		DW	0		;
        LTIMER		DW	0		; variable for the empty detector
 
 @CODE
@@ -54,7 +54,6 @@ EnableInterrupt:
 	ADD		R0		R5			; Add datapath to the code
 	LOAD		R1		16			; Set R1 := 16
 	STOR		R0		[R1]			; Save R0 in the address of R1
-	SETI		8					; Enable the interrupt service routine
 	 BRA		Main
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -62,12 +61,12 @@ EnableInterrupt:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 TimerISR:
+	LOAD		R0		[GB+DELTA]
+	STOR		R0		[R5+TIMER]
 	 BRS		AbortCheck				; Checking if the abort button has been pressed
 	 BRS		StopCheck				; Checking if the stop button has been pressed
 	 BRS		LightTimerDecrease			; Decrease for the timer of the color detector light
 	 BRS		Output					; Subroutine for the outputs
-	LOAD		R0		[GB+DELTA]
-	STOR		R0		[R5+TIMER]
 	SETI		8
 	 RTE
 	 
@@ -83,7 +82,7 @@ AbortCheck:
 	LOAD		R1		[R5+INPUT]
 	 AND		R1		ABORTB
 	 BNE		AbortReturn
-	LOAD		R4		0
+	LOAD		R4		1
 	STOR		R4		[GB+ABORT]
 	  
 AbortReturn:
@@ -152,7 +151,8 @@ Main:
 	LOAD		R0		[GB+DELTA]		; Set R0 := DELTA
 	 SUB		R0		[R5+TIMER]		; R0 := -TIMER
 	STOR		R0		[R5+TIMER]		; TIMER := TIMER+R0
-
+	SETI		8					; Enable the interrupt service routine
+	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	States			;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -162,7 +162,8 @@ Off:
 	 BNE		Abort					; Branch if we aborted
 	LOAD		R2		MOTORCW			; Load the MOTORCW value
 	STOR		R2		[GB+MOTOR]		; Set the motor to turn CW
-	
+	 BRA		Off
+	 
 ToIdle:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
@@ -379,7 +380,7 @@ Finished:
 	 BRA		ToIdle1
 	
 Abort:
-	LOAD		R4		1
+	LOAD		R4		0
 	STOR		R4		[GB+ABORT]
 	LOAD		R0		OFF
 	STOR		R0		[GB+STATE+LPROXB]
