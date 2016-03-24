@@ -23,8 +23,8 @@
       ADCONVS		EQU	6		; the outputs, concatenated, of the 2 A/D-converters
 	
 			; Button and Detector values
-       STARTB		EQU	%000000001	; location of the Start/Stop button
-       ABORTB		EQU	%000000010	; location of the Abort button
+       ABORTB		EQU	%000000001	; location of the Abort button
+       STARTB		EQU	%000000010	; location of the Start/Stop button
 	   S1		EQU	%000001000	; location of S1
 	   S2		EQU	%000010000	; location of S2
 	PROXB		EQU	%000100000	; location of PROXB
@@ -116,8 +116,16 @@ LightTimerDecrease:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Output:
-	LOAD		R1		[GB+STATE]		; Load state of lights
-
+	LOAD		R1		%00000000		; Initialize R1 at no bits to be on
+	LOAD		R2		[GB+STATE+LPROXB]	; Get the LPROXB bit
+	  OR		R1		R2			; Set the bit to be in the 1st position on R1
+	LOAD		R2		[GB+STATE+LPROXW]	; Get the LPROXW bit
+	MULS		R2		%0010			; Move the bit to the 2nd position
+	  OR		R1		R2			; Set the bit on position 2
+	LOAD		R2		[GB+STATE+LCOLOR]	; Get the LCOLOR bit
+	MULS		R2		%0100			; Move the bit to the 3rd position
+	  OR		R1		R2			; Finally compile the whole thing in R1
+	
 MotorCheck:
 	LOAD		R0		[GB+STEP]		; Load STEP in R0
 	 CMP		R0		[GB+PWM]		; See if R0 is smaller than PWM
@@ -219,8 +227,8 @@ IdleCheckInit:
 	LOAD		R2		MOTORCW			; Load the MOTORCW value
 	STOR 		R2		[GB+MOTOR]		; Set the motor to turn CW
 	LOAD		R2		ON			; Load the ON value
-	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
-	STOR		R2		[GB+STATE+LPROXW]
+	STOR		R2		[GB+STATE+LPROXB]	; Set the PROXB light to be ON
+	STOR		R2		[GB+STATE+LPROXW]	; Set the PROXW light to be ON
 
 IdleCheck:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -382,7 +390,6 @@ Finished:
 Abort:
 	LOAD		R0		%0111
 	STOR		R0		[R5+LEDS]
-	
 	LOAD		R4		0
 	STOR		R4		[GB+ABORT]
 	LOAD		R0		OFF
