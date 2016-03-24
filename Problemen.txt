@@ -1,0 +1,2 @@
+- Disks vallen soms naast het bakje
+- Hij abort af en toe als hij de proximity detector mist

@@ -213,6 +213,10 @@ IdleFill:
 	 BNE		Abort					; Branch if we aborted
 	LOAD		R2		MOTOROFF		; Load the MOTOROFF value
 	STOR		R2		[GB+MOTOR]		; Set the motor to be OFF
+	LOAD		R2		ON			; Load the ON value
+	STOR		R2		[GB+STATE+LPROXB]	; Set the PROXB light to be ON
+	STOR		R2		[GB+STATE+LPROXW]	; Set the PROXW light to be ON
+	STOR		R2		[GB+STATE+LCOLOR]	; Set the COLOR light to be ON
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R0		STARTB			; Check if STARTB is high
@@ -224,10 +228,6 @@ IdleCheckInit:
 	 BNE		Abort					; Branch if we aborted
 	LOAD		R4		0			; Load 0 into R4
 	STOR		R4		[GB+PAUSED]		; Unpause the machine
-	LOAD		R2		ON			; Load the ON value
-	STOR		R2		[GB+STATE+LPROXB]	; Set the PROXB light to be ON
-	STOR		R2		[GB+STATE+LPROXW]	; Set the PROXW light to be ON
-	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCW			; Load the MOTORCW value
 	STOR 		R2		[GB+MOTOR]		; Set the motor to turn CW
 
@@ -252,9 +252,6 @@ IdleCheck:
 Idle:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	LOAD		R0		OFF
-	STOR		R0		[GB+STATE+LPROXB]
-	STOR		R0		[GB+STATE+LPROXW]
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
 	LOAD		R4		[GB+PAUSED]
@@ -264,7 +261,6 @@ Idle:
 IdlePausedInit:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	 BRS		LightSwitch
 	LOAD		R1		[R5+INPUT]
 	 AND		R1		PROXE
 	 BNE		IdlePaused
@@ -284,7 +280,6 @@ IdlePaused:
 Scanning:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	 BRS		LightSwitch
 	LOAD		R1		[R5+INPUT]
 	 AND		R1		PROXE
 	 BNE		Finished
@@ -297,10 +292,6 @@ Scanning:
 TurnBlack:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	LOAD		R2		ON			; Load the on variable
-	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
-	STOR		R2		[GB+STATE+LPROXW]
-	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCW			; Load the CW value
 	STOR		R2		[GB+MOTOR]		; Make the motor rotate CW
 	
@@ -343,10 +334,6 @@ TurnBlack2:
 TurnWhite:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	LOAD		R2		ON			; Load the on variable
-	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
-	STOR		R2		[GB+STATE+LPROXW]
-	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCCW		; Load the CCW value
 	STOR		R2		[GB+MOTOR]		; Make the motor rotate CCW
 	
@@ -410,53 +397,7 @@ Abort:
 	 BNE		Off  
 	 BRA		Abort
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	LightSwitch		;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-LightSwitch:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R0		ETIME
-	STOR		R0		[GB+LTIMER]
-	LOAD		R2		ON
-	STOR		R2		[GB+STATE+LCOLOR]
-	
-LightSwitchLoop:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R0		[GB+LTIMER]
-	 BNE		LightSwitchLoop
-	 
-LightSwitchFinish:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R2		OFF
-	STOR		R2		[GB+STATE+LCOLOR]
-	
-LightSwitchDone:
-	 RTS							; Subrouting for turning the color detector light on, takes 1700 ticks to warm up
-
-LightSwitchProx:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R0		ETIME
-	STOR		R0		[GB+LTIMER]
-	
-LightSwitchProxLoop:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R0		[GB+LTIMER]
-	 BNE		LightSwitchLoop
-	 
-LightSwitchProxFinish:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	
-LightSwitchProxDone:
-	 RTS							; Subrouting for turning the prox detector light on, takes 1700 ticks to warm up
-
-	 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Button Checks		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
