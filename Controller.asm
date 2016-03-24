@@ -5,7 +5,7 @@
 	DELTA		DW	1		; value for timer delay
 	 STEP		DW	0		; current step, for PWM
 	  PWM		DW	3		; max value for PWM
-	MOTOR		DS	2		; variable for motor state
+	MOTOR		DS	1		; variable for motor state
 	STATE		DS	3		; variable for state ColorLight:ProxLightW:ProxLightB
        PAUSED		DW	1		;
         ABORT		DW	1		;
@@ -158,19 +158,11 @@ Main:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Off:
-<<<<<<< HEAD
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
 	LOAD		R2		MOTORCW			; Load the MOTORCW value
 	STOR		R2		[GB+MOTOR]		; Set the motor to turn CW
 	
-=======
-	LOAD		R4		[GB+ABORT]
-	 BNE		Abort
-	LOAD		R2		MOTORCW
-	STOR		R2		[GB+MOTOR]
-
->>>>>>> origin/master
 ToIdle:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
@@ -441,89 +433,6 @@ ButtonCheck:
 	STOR		R0		[GB+BUTBUF]
 	 RTS							; Returns the new current pressed buttons in CURBUT, saves all current buttons pressed in BUTBUF
 
-<<<<<<< HEAD
-=======
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Abort and Pause Check	;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-AbortCheck:
-	LOAD		R1		[R5+INPUT]
-	 AND		R1		ABORTB
-	 BNE		AbortReturn
-	LOAD		R4		1
-	STOR		R4		[GB+ABORT]
-	  
-AbortReturn:
-	 RTS
-
-StopCheck:
-	 BRS		StopButtonCheck
-	LOAD		R1		[GB+STOPBUT]
-	 AND		R1		STARTB
-	 BNE		StopReturn
-	LOAD		R4		1
-	STOR		R4		[GB+PAUSED]
-	  
-StopReturn:
-	 RTS
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	LightTimer		;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-LightTimerDecrease:
-	LOAD		R0		[GB+LTIMER]
-	 SUB		R0		1
-	STOR		R0		[GB+LTIMER]
-	 RTS
-	 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Output			;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-Output:
-	LOAD		R1		[GB+STATE]
-
-MotorCheck:
-	LOAD		R0		[GB+STEP]
-	 CMP		R0		[GB+PWM]
-	 BGT		MotorOff
-	 BRA		MotorOn
-	  
-MotorOff:
-	LOAD		R2		MOTOROFF
-	 BRA		Motor
-
-MotorOn:
-	LOAD		R2		[GB+MOTOR]
-
-Motor:
-	MULS		R2		%010000
-	  OR		R1		R2
-
-Step:
-	 MOD		R0		4
-	 ADD		R0		1
-	STOR		R0		[GB+STEP]
-	STOR		R1		[GB+OUTPUT]
-	 RTS
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Timer Interupt		;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-TimerISR:
-	 BRS		AbortCheck
-	 BRS		StopCheck
-	 BRS		LightTimerDecrease
-	 BRS		Output
-	
-	LOAD		R0		[GB+DELTA]
-	STOR		R0		[R5+TIMER]
-	SETI		8
-	 RTE
->>>>>>> origin/master
 	
 
 @END
