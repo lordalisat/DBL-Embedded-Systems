@@ -1,0 +1,1 @@
+Optionally merge StopButCheck & But check

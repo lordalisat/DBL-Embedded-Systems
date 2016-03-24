@@ -51,7 +51,7 @@
 
 EnableInterrupt:
 	LOAD		R0		TimerISR		; Store the address of the ISR part in R0
-	ADD		R0		R5			; Add datapath to the code
+	 ADD		R0		R5			; Add datapath to the code
 	LOAD		R1		16			; Set R1 := 16
 	STOR		R0		[R1]			; Save R0 in the address of R1
 	 BRA		Main
@@ -81,7 +81,7 @@ TimerISR:
 AbortCheck:
 	LOAD		R1		[R5+INPUT]
 	 AND		R1		ABORTB
-	 BNE		AbortReturn
+	 BEQ		AbortReturn
 	LOAD		R4		1
 	STOR		R4		[GB+ABORT]
 	  
@@ -94,7 +94,7 @@ StopCheck:
 	 BNE		StopReturn
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		STARTB
-	 BNE		StopReturn
+	 BEQ		StopReturn
 	LOAD		R4		1
 	STOR		R4		[GB+PAUSED]
 	  
@@ -116,30 +116,31 @@ LightTimerDecrease:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Output:
-	LOAD		R1		[GB+STATE]
+	LOAD		R1		[GB+STATE]		; Load state of lights
 
 MotorCheck:
-	LOAD		R0		[GB+STEP]
-	 CMP		R0		[GB+PWM]
-	 BGT		MotorOff
-	 BRA		MotorOn
-	  
+	LOAD		R0		[GB+STEP]		; Load STEP in R0
+	 CMP		R0		[GB+PWM]		; See if R0 is smaller than PWM
+	 BCS		MotorOn					; Branch to MotorOn
+	 BRA		MotorOff				; Otherwise to MotorOff
+	
 MotorOff:
-	LOAD		R2		MOTOROFF
-	 BRA		Motor
+
+	LOAD		R2		MOTOROFF		; Get the MOTOROFF state
+	 BRA		Motor					; Branch to Motor
 
 MotorOn:
-	LOAD		R2		[GB+MOTOR]
+	LOAD		R2		[GB+MOTOR]		; Load the MOTOR value that we want
 
 Motor:
-	MULS		R2		%010000
-	  OR		R1		R2
+	MULS		R2		%010000			; Multiply by 16
+	  OR		R1		R2			; Or the light state and motor state
 
 Step:
-	 MOD		R0		4
-	 ADD		R0		1
-	STOR		R0		[GB+STEP]
-	STOR		R1		[R5+OUTPUT]
+	STOR		R1		[R5+OUTPUT]		; Set the calculated output
+	 MOD		R0		4			; Modulo step by 4 (NOTE: 0:0 - 
+	 ADD		R0		1			; Add one to the step	(NOTE: 0:1 - 
+	STOR		R0		[GB+STEP]		; Store it back in STEP
 	 RTS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -162,8 +163,7 @@ Off:
 	 BNE		Abort					; Branch if we aborted
 	LOAD		R2		MOTORCW			; Load the MOTORCW value
 	STOR		R2		[GB+MOTOR]		; Set the motor to turn CW
-	 BRA		Off
-	 
+
 ToIdle:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
@@ -380,6 +380,9 @@ Finished:
 	 BRA		ToIdle1
 	
 Abort:
+	LOAD		R0		%0111
+	STOR		R0		[R5+LEDS]
+	
 	LOAD		R4		0
 	STOR		R4		[GB+ABORT]
 	LOAD		R0		OFF
