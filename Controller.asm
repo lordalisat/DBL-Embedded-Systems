@@ -1,5 +1,5 @@
 @DATA
-
+	ERROR		DS	1		; HEX7SEGMENTS
        BUTBUF		DS	1		; the previous button input
        CURBUT		DS	1		;
 	DELTA		DW	10		; value for timer delay
@@ -44,6 +44,15 @@
       
         BLACK		EQU	%010101000	; colordet 168 for black
         ETIME		EQU	170		; 11 ms marge van 1590
+        
+       HESOFF		EQU	%00000000
+         HEXE		EQU	%01001111
+         HEXR		EQU	%00000101
+         HEX0		EQU	%01111110
+         HEX1		EQU	%00110000
+         HEX2		EQU	%01101101
+         HEX3		EQU	%01111001
+         HEX4		EQU	%00110011
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Timer Interrupt Enable	;
@@ -150,6 +159,25 @@ Step:
 	 ADD		R0		1			; Add one to the step	(NOTE: 0:1 - 
 	STOR		R0		[GB+STEP]		; Store it back in STEP
 	 RTS
+	 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Display			;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+do_digit:
+	LOAD  R4  [GB+current_digit]
+	ADD   R4  1				; Move to next digit
+	MOD   R4  6				; 
+	STOR  R4  [GB+current_digit]
+	LOAD  R0  GB			; Load the start of where the digits are stored.
+	ADD   R0  SEGMENTS		; 
+	LOAD  R0  [R0+R4]		; Load the value of the digit R4
+	BRS   Hex7Seg			; Lookup the value of the leds.
+	STOR  R1  [R5+DSPSEG]		; Write digit.
+	LOAD  R0  R4
+	BRS   getDigit
+	STOR  R1  [R5+DSPDIG]
+	RTS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Main			;
@@ -190,7 +218,7 @@ ToIdle1:
 	 BRS		ButtonCheck
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S1
-	 BNE		Abort
+	 BNE		AbortS2
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S2
 	 BNE		IdleFill
@@ -205,7 +233,7 @@ ToIdle2:
 	 BNE		ToIdle1
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S2
-	 BNE		Abort
+	 BNE		AbortS1
 	 BRA		ToIdle2
 	
 IdleFill:
@@ -237,16 +265,16 @@ IdleCheck:
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS1					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS1					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
 	 BNE		Idle					; If it is, go to Idle
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS1					; If it is, abort
 	 BRA		IdleCheck				; Loop through TurnBlack2
 	 
 Idle:
@@ -310,13 +338,13 @@ TurnBlack1:
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
 	 BNE		TurnBlack2				; If it is, go to TurnBlack2
@@ -331,13 +359,13 @@ TurnBlack2:
 	 BNE		IdleCheck				; If it is, go to IdleCheck
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXB					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXB					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXB					; If it is, abort
 	 BRA		TurnBlack2				; Loop through TurnBlack2
 
 TurnWhite:
@@ -356,13 +384,13 @@ TurnWhite1:
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
 	 BNE		TurnWhite2				; If it is, go to TurnWhite2
@@ -374,16 +402,16 @@ TurnWhite2:
 	 BRS		ButtonCheck				; Get the button states
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXW					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
 	 BNE		IdleCheck				; If it is, go to IdleCheck
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXW					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXW					; If it is, abort
 	 BRA		TurnWhite2				; Loop through TurnWhite2
 
 Finished:
@@ -393,7 +421,27 @@ Finished:
 	STOR		R2		[GB+MOTOR]
 	 BRA		ToIdle1
 	
+AbortS1:
+	LOAD		R0		HEX1
+	STOR		R0		[GB+ERROR]
+
+AbortS2:
+	LOAD		R0		HEX2
+	STOR		R0		[GB+ERROR]
+
+AbortLPROXB:
+	LOAD		R0		HEX3
+	STOR		R0		[GB+ERROR]
+
+AbortLPROXW:
+	LOAD		R0		HEX4
+	STOR		R0		[GB+ERROR]
+	
 Abort:
+	LOAD		R0		HEX0
+	STOR		R0		[GB+ERROR]
+
+AbortLoop:
 	LOAD		R0		%0111
 	STOR		R0		[R5+LEDS]
 	LOAD		R4		0
@@ -404,11 +452,33 @@ Abort:
 	STOR		R0		[GB+STATE+LCOLOR]
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
+	LOAD		R1		5
+	LOAD		R0		HEXE
+	STOR		R0		[R5+DSPSEG]
+	STOR		R1		[R5+DSPDIG]
+	 SUB		R1		1
+	LOAD		R0		HEXR
+	STOR		R0		[R5+DSPSEG]
+	STOR		R1		[R5+DSPDIG]
+	 SUB		R1		1
+	LOAD		R0		HEXR
+	STOR		R0		[R5+DSPSEG]
+	STOR		R1		[R5+DSPDIG]
+	 SUB		R1		1
+	LOAD		R0		HEX0
+	STOR		R0		[R5+DSPSEG]
+	STOR		R1		[R5+DSPDIG]
+	 SUB		R1		1
+	LOAD		R0		[GB+ERROR]
+	STOR		R0		[R5+DSPSEG]
+	STOR		R1		[R5+DSPDIG]
 	 BRS		ButtonCheck
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		STARTB
-	 BNE		Off  
-	 BRA		Abort
+	 BEQ		AbortLoop
+	LOAD		R0		HEXOFF
+	STOR		R0		[R5+DSPSEG]
+	 BRA		Off
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	LightSwitch		;
