@@ -1,5 +1,5 @@
 @DATA
-
+	ERROR		DW	1
        BUTBUF		DS	1		; the previous button input
        CURBUT		DS	1		;
 	DELTA		DW	10		; value for timer delay
@@ -10,6 +10,8 @@
        PAUSED		DW	1		;
         ABORT		DW	0		;
        LTIMER		DW	0		; variable for the empty detector
+       BLACKE		DW	0		; for when disks do a flip
+       WHITEE		DW	0		; for when disks do a flip
 
 @CODE
 
@@ -190,7 +192,7 @@ ToIdle1:
 	 BRS		ButtonCheck
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S1
-	 BNE		Abort
+	 BNE		AbortS2
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S2
 	 BNE		IdleFill
@@ -205,7 +207,7 @@ ToIdle2:
 	 BNE		ToIdle1
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		S2
-	 BNE		Abort
+	 BNE		AbortS1
 	 BRA		ToIdle2
 	
 IdleFill:
@@ -237,16 +239,16 @@ IdleCheck:
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS1					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS1					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
 	 BNE		Idle					; If it is, go to Idle
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS1					; If it is, abort
 	 BRA		IdleCheck				; Loop through TurnBlack2
 	 
 Idle:
@@ -301,13 +303,13 @@ TurnBlack1:
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
 	 BNE		TurnBlack2				; If it is, go to TurnBlack2
@@ -322,13 +324,13 @@ TurnBlack2:
 	 BNE		IdleCheck				; If it is, go to IdleCheck
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXB				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		FlipErrorB				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXB				; If it is, abort
 	 BRA		TurnBlack2				; Loop through TurnBlack2
 
 TurnWhite:
@@ -343,13 +345,13 @@ TurnWhite1:
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
 	 BNE		TurnWhite2				; If it is, go to TurnWhite2
@@ -361,16 +363,16 @@ TurnWhite2:
 	 BRS		ButtonCheck				; Get the button states
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXW				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXW			; Check if PROXW is high
 	 BNE		IdleCheck				; If it is, go to IdleCheck
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		FlipErrorW				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		Abort					; If it is, abort
+	 BNE		AbortPROXW					; If it is, abort
 	 BRA		TurnWhite2				; Loop through TurnWhite2
 
 Finished:
@@ -380,7 +382,50 @@ Finished:
 	STOR		R2		[GB+MOTOR]
 	 BRA		ToIdle1
 	
+FlipErrorB:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R1		[GB+BLACKE]
+	 BNE		AbortPROXB
+	LOAD		R0		1
+	STOR		R0		[GB+BLACKE]
+	 BRA		Idle
+	 
+FlipErrorW:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R1		[GB+WHITEE]
+	 BNE		AbortPROXW
+	LOAD		R0		1
+	STOR		R0		[GB+BLACKE]
+	 BRA		Idle
+	
+AbortS1:
+	LOAD		R0		HEX1
+	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
+
+AbortS2:
+	LOAD		R0		HEX2
+	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
+
+AbortPROXB:
+	LOAD		R0		HEX3
+	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
+
+AbortPROXW:
+	LOAD		R0		HEX4
+	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
+	
 Abort:
+	LOAD		R0		HEX0
+	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
+	
+AbortLoop:
 	LOAD		R0		%0111
 	STOR		R0		[R5+LEDS]
 	LOAD		R4		0

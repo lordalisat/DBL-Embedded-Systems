@@ -163,12 +163,6 @@ Step:
 	 RTS
 	 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Display			;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Main			;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -434,22 +428,27 @@ FlipErrorW:
 AbortS1:
 	LOAD		R0		HEX1
 	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
 
 AbortS2:
 	LOAD		R0		HEX2
 	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
 
 AbortPROXB:
 	LOAD		R0		HEX3
 	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
 
 AbortPROXW:
 	LOAD		R0		HEX4
 	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
 	
 Abort:
 	LOAD		R0		HEX0
 	STOR		R0		[GB+ERROR]
+	 BRA		AbortLoop
 
 AbortLoop:
 	LOAD		R0		%0111
