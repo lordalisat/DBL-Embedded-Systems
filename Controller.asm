@@ -1,5 +1,5 @@
 @DATA
-	ERROR		DS	1		; HEX7SEGMENTS
+	ERROR		DS	1		; HEXERRORCODE
        BUTBUF		DS	1		; the previous button input
        CURBUT		DS	1		;
 	DELTA		DW	10		; value for timer delay
@@ -10,6 +10,8 @@
        PAUSED		DW	1		;
         ABORT		DW	0		;
        LTIMER		DW	0		; variable for the empty detector
+       BLACKE		DW	0		; for when disks do a flip
+       WHITEE		DW	0		; for when disks do a flip
 
 @CODE
 
@@ -45,7 +47,7 @@
         BLACK		EQU	%010101000	; colordet 168 for black
         ETIME		EQU	170		; 11 ms marge van 1590
         
-       HESOFF		EQU	%00000000
+       HEXOFF		EQU	%00000000
          HEXE		EQU	%01001111
          HEXR		EQU	%00000101
          HEX0		EQU	%01111110
@@ -164,20 +166,7 @@ Step:
 ;	Display			;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-do_digit:
-	LOAD  R4  [GB+current_digit]
-	ADD   R4  1				; Move to next digit
-	MOD   R4  6				; 
-	STOR  R4  [GB+current_digit]
-	LOAD  R0  GB			; Load the start of where the digits are stored.
-	ADD   R0  SEGMENTS		; 
-	LOAD  R0  [R0+R4]		; Load the value of the digit R4
-	BRS   Hex7Seg			; Lookup the value of the leds.
-	STOR  R1  [R5+DSPSEG]		; Write digit.
-	LOAD  R0  R4
-	BRS   getDigit
-	STOR  R1  [R5+DSPDIG]
-	RTS
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Main			;
@@ -262,6 +251,9 @@ IdleCheckInit:
 IdleCheck:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
+	LOAD		R0		0
+	STOR		R0		[GB+BLACKE]
+	STOR		R0		[GB+WHITEE]
 	 BRS		ButtonCheck				; Get the button state
 	LOAD		R1		[GB+CURBUT]		; Get the input values
 	 AND		R1		PROXB			; Check if PROXB is high
@@ -362,7 +354,7 @@ TurnBlack2:
 	 BNE		AbortPROXB					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		AbortPROXB					; If it is, abort
+	 BNE		FlipErrorB				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
 	 BNE		AbortPROXB					; If it is, abort
@@ -408,7 +400,7 @@ TurnWhite2:
 	 BNE		IdleCheck				; If it is, go to IdleCheck
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
-	 BNE		AbortPROXW					; If it is, abort
+	 BNE		FlipErrorW				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
 	 BNE		AbortPROXW					; If it is, abort
@@ -421,6 +413,24 @@ Finished:
 	STOR		R2		[GB+MOTOR]
 	 BRA		ToIdle1
 	
+FlipErrorB:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R1		[GB+BLACKE]
+	 BNE		AbortPROXB
+	LOAD		R0		1
+	STOR		R0		[GB+BLACKE]
+	 BRA		Idle
+	 
+FlipErrorW:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R1		[GB+WHITEE]
+	 BNE		AbortPROXW
+	LOAD		R0		1
+	STOR		R0		[GB+BLACKE]
+	 BRA		Idle
+	
 AbortS1:
 	LOAD		R0		HEX1
 	STOR		R0		[GB+ERROR]
@@ -429,11 +439,11 @@ AbortS2:
 	LOAD		R0		HEX2
 	STOR		R0		[GB+ERROR]
 
-AbortLPROXB:
+AbortPROXB:
 	LOAD		R0		HEX3
 	STOR		R0		[GB+ERROR]
 
-AbortLPROXW:
+AbortPROXW:
 	LOAD		R0		HEX4
 	STOR		R0		[GB+ERROR]
 	
