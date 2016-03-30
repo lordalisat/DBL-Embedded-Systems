@@ -1,0 +1,11 @@
+Error 0: ToIdle1 S1       : S2 not working
+Error 1: ToIdle2 S2       : S1 not working
+Error 2: IdleCheck S2     : S1 not working
+Error 3: TurnBlack1 PROXB : S2 not working
+Error 4: TurnBlack2 PROXW : Machine motor is attached the wrong way around
+Error 5: TurnBlack2 S2    : PROXB and S1 not working, or S2 randomly pressed
+Error 6: TurnWhite1 PROXW : S2 not working
+Error 7: TurnWhite2 PROXB : Machine motor is attached the wrong way around
+Error 8: TurnWhite2 S2    : PROXW and S1 not working, or S2 randomly pressed
+Error 9: FlipErrorB S1    : PROXB not working
+Error A: FlipErrorW S1    : PROXW not working
