@@ -1,2 +1,4 @@
-Optionally merge StopButCheck & But check
-Check if motor is disconnected (timeout)
+Check if motor is disconnected (timeout, add other error: AbortB)
+
+Have a look at the StopCheck subroutine (To-Do label)
+Have a look at the Scanning state: LightSwitch subroutine (To-Do label)
