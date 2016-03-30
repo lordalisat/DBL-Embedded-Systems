@@ -3,6 +3,8 @@
        CERROR		DS	1		; COLORHEXERRORCODE
        BUTBUF		DS	1		; the previous button input
        CURBUT		DS	1		;
+      STOPBUF		DS	1		; the previous stop button input
+      CURSTOP		DS	1		;
 	DELTA		DW	1		; value for timer delay
 	 STEP		DW	0		; current step, for PWM
 	  PWM		DW	3		; max value for PWM
@@ -18,7 +20,6 @@
        NDIGIT		DS	1		; binary pattern for next digit
 
 @CODE
-
       IO_AREA		EQU	-16		; base address of the I/O-Area
         TIMER		EQU	13		; timer register
        OUTPUT		EQU	11		; the 8 outputs
@@ -48,8 +49,8 @@
      	   ON		EQU	%01		; Binary on
      	  OFF		EQU	%00		; Binary off
       
-        BLACK		EQU	%010101000	; colordet 168 for black
-        ETIME		EQU	1700		; 11 ms marge van 1590
+        BLACK		EQU	179		; colordet 168 for black
+        ETIME		EQU	1800		; 11 ms marge van 1590
         
        HEXOFF		EQU	%00000000
          HEXE		EQU	%01001111
@@ -101,10 +102,10 @@ AbortReturn:
 	 RTS
 
 StopCheck:
-	 BRS		ButtonCheck
+	 BRS		StopButtonCheck
 	LOAD		R1		[GB+PAUSED]
 	 BNE		StopReturn
-	LOAD		R1		[GB+CURBUT]
+	LOAD		R1		[GB+CURSTOP]
 	 AND		R1		STARTB
 	 BEQ		StopReturn
 	LOAD		R4		1
@@ -273,7 +274,9 @@ IdleCheckInit:
 	LOAD		R2		ON			; Load the ON value
 	STOR		R2		[GB+STATE+LPROXB]	; Set the PROXB light to be ON
 	STOR		R2		[GB+STATE+LPROXW]	; Set the PROXW light to be ON
-	 BRS		LightSwitchProx
+	STOR		R2		[GB+STATE+LCOLOR]
+	 BRS		LightSwitch
+	 BRS		ButtonCheck
 	LOAD		R2		MOTORCW			; Load the MOTORCW value
 	STOR 		R2		[GB+MOTOR]		; Set the motor to turn CW
 
@@ -284,26 +287,23 @@ IdleCheck:
 	STOR		R0		[GB+BLACKE]
 	STOR		R0		[GB+WHITEE]
 	 BRS		ButtonCheck				; Get the button state
-	LOAD		R1		[GB+CURBUT]		; Get the input values
-	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		AbortS1					; If it is, abort
-	LOAD		R1		[GB+CURBUT]		; Get the input values
-	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		AbortS1					; If it is, abort
+;	LOAD		R1		[GB+CURBUT]		; Get the input values
+;	 AND		R1		PROXB			; Check if PROXB is high
+;	 BNE		AbortPROXB				; If it is, abort
+;	LOAD		R1		[GB+CURBUT]		; Get the input values
+;	 AND		R1		PROXW			; Check if PROXW is high
+;	 BNE		AbortPROXW				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
 	 BNE		Idle					; If it is, go to Idle
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S2			; Check if S2 is high
-	 BNE		AbortS1					; If it is, abort
+	 BNE		AbortS1				; If it is, abort
 	 BRA		IdleCheck				; Loop through TurnBlack2
 	 
 Idle:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	LOAD		R0		OFF
-	STOR		R0		[GB+STATE+LPROXB]
-	STOR		R0		[GB+STATE+LPROXW]
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
 	LOAD		R4		[GB+PAUSED]
@@ -313,8 +313,11 @@ Idle:
 IdlePausedInit:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	 BRS		LightSwitch
+	LOAD		R0		OFF
+	STOR		R0		[GB+STATE+LPROXB]
+	STOR		R0		[GB+STATE+LPROXW]
 	LOAD		R1		[R5+INPUT]
+	STOR		R0		[GB+STATE+LCOLOR]
 	 AND		R1		PROXE
 	 BNE		IdlePaused
 	LOAD		R2		MOTORCW
@@ -327,8 +330,17 @@ IdlePaused:
 	 BRS		ButtonCheck
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		STARTB
-	 BNE		Scanning
+	 BNE		ToScanning
 	 BRA		IdlePaused
+	 
+ToScanning:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R0		ON
+	STOR		R0		[GB+STATE+LPROXB]
+	STOR		R0		[GB+STATE+LPROXW]
+	STOR		R0		[GB+STATE+LCOLOR]
+	 BRS		LightSwitch
 
 Scanning:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -337,9 +349,10 @@ Scanning:
 	LOAD		R1		[R5+INPUT]
 	 AND		R1		PROXE
 	 BNE		Finished
+
 	LOAD		R1		[R5+ADCONVS]
 	DVMD		R1		256
-	
+	LOAD		R4		R2
 	DVMD		R2		10			; Stel R2 = 168 -> R2 16, R3 8
 	LOAD		R0		R3			; R0 := R3
 	 BRS		Hex2Seg7				; 
@@ -352,21 +365,16 @@ Scanning:
 	LOAD		R0		R3
 	 BRS		Hex2Seg7
 	STOR		R1		[GB+DIGITS+2]
-	
-	 CMP		R2		BLACK
+
+	 CMP		R4		BLACK
 	 BPL		TurnBlack
 	 BRA		TurnWhite
 
 TurnBlack:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	LOAD		R2		ON			; Load the on variable
-	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
-	STOR		R2		[GB+STATE+LPROXW]
-	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCW			; Load the CW value
 	STOR		R2		[GB+MOTOR]		; Make the motor rotate CW
-	
 	LOAD		R2		%011111111
 	STOR		R2		[GB+CERROR]
 	
@@ -374,12 +382,12 @@ TurnBlack1:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
 	 BRS		ButtonCheck				; Get the button state
-	LOAD		R1		[GB+CURBUT]		; Get the input values
-	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		AbortS2					; If it is, abort
-	LOAD		R1		[GB+CURBUT]		; Get the input values
-	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		AbortS2					; If it is, abort
+;	LOAD		R1		[GB+CURBUT]		; Get the input values
+;	 AND		R1		PROXB			; Check if PROXB is high
+;	 BNE		AbortS2					; If it is, abort
+;	LOAD		R1		[GB+CURBUT]		; Get the input values
+;	 AND		R1		PROXW			; Check if PROXW is high
+;	 BNE		AbortPROXW				; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
 	 BNE		AbortS2					; If it is, abort
@@ -409,13 +417,8 @@ TurnBlack2:
 TurnWhite:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	LOAD		R2		ON			; Load the on variable
-	STOR		R2		[GB+STATE+LPROXB]	; Set the PROX lights to be ON
-	STOR		R2		[GB+STATE+LPROXW]
-	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCCW		; Load the CCW value
 	STOR		R2		[GB+MOTOR]		; Make the motor rotate CCW
-	
 	LOAD		R2		%01001111
 	STOR		R2		[GB+CERROR]
 	
@@ -423,12 +426,12 @@ TurnWhite1:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
 	 BRS		ButtonCheck				; Get the button state
-	LOAD		R1		[GB+CURBUT]		; Get the input values
-	 AND		R1		PROXB			; Check if PROXB is high
-	 BNE		AbortS2					; If it is, abort
-	LOAD		R1		[GB+CURBUT]		; Get the input values
-	 AND		R1		PROXW			; Check if PROXW is high
-	 BNE		AbortS2					; If it is, abort
+;	LOAD		R1		[GB+CURBUT]		; Get the input values
+;	 AND		R1		PROXB			; Check if PROXB is high
+;	 BNE		AbortS2					; If it is, abort
+;	LOAD		R1		[GB+CURBUT]		; Get the input values
+;	 AND		R1		PROXW			; Check if PROXW is high
+;	 BNE		AbortS2					; If it is, abort
 	LOAD		R1		[GB+CURBUT]		; Load the values
 	 AND		R1		S1			; Check if S1 is high
 	 BNE		AbortS2					; If it is, abort
@@ -458,6 +461,10 @@ TurnWhite2:
 Finished:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
+	LOAD		R0		OFF
+	STOR		R0		[GB+STATE+LPROXB]
+	STOR		R0		[GB+STATE+LPROXW]
+	STOR		R0		[GB+STATE+LCOLOR]
 	LOAD		R2		MOTORCW
 	STOR		R2		[GB+MOTOR]
 	 BRA		ToIdle1
@@ -477,7 +484,7 @@ FlipErrorW:
 	LOAD		R1		[GB+WHITEE]
 	 BNE		AbortPROXW
 	LOAD		R0		1
-	STOR		R0		[GB+BLACKE]
+	STOR		R0		[GB+WHITEE]
 	 BRA		Idle
 	
 AbortS1:
@@ -557,8 +564,6 @@ LightSwitch:
 	 BNE		LightSwitchDone
 	LOAD		R0		ETIME
 	STOR		R0		[GB+LTIMER]
-	LOAD		R2		ON
-	STOR		R2		[GB+STATE+LCOLOR]
 	
 LightSwitchLoop:
 	LOAD		R4		[GB+ABORT]
@@ -569,29 +574,8 @@ LightSwitchLoop:
 LightSwitchFinish:
 	LOAD		R4		[GB+ABORT]
 	 BNE		LightSwitchDone
-	LOAD		R2		OFF
-	STOR		R2		[GB+STATE+LCOLOR]
 	
 LightSwitchDone:
-	 RTS							; Subrouting for turning the color detector light on, takes 1700 ticks to warm up
-
-LightSwitchProx:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R0		ETIME
-	STOR		R0		[GB+LTIMER]
-	
-LightSwitchProxLoop:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	LOAD		R0		[GB+LTIMER]
-	 BNE		LightSwitchLoop
-	 
-LightSwitchProxFinish:
-	LOAD		R4		[GB+ABORT]
-	 BNE		LightSwitchDone
-	
-LightSwitchProxDone:
 	 RTS							; Subrouting for turning the prox detector light on, takes 1700 ticks to warm up
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -643,6 +627,13 @@ ButtonCheck:
 	STOR		R0		[GB+BUTBUF]
 	 RTS							; Returns the new current pressed buttons in CURBUT, saves all current buttons pressed in BUTBUF
 
-	
+StopButtonCheck:
+	LOAD		R3		[GB+STOPBUF]
+	LOAD		R0		[R5+INPUT]
+	 XOR		R3		%011111111
+	 AND		R3		R0
+	STOR		R3		[GB+CURSTOP]
+	STOR		R0		[GB+STOPBUF]
+	 RTS							; Returns the new current pressed buttons in CURBUT, saves all current buttons pressed in BUTBUF	
 
 @END
