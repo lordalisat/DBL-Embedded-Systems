@@ -378,27 +378,21 @@ IdlePaused:
 	 BRS		ButtonCheck				; Run the ButtonCheck subroutine
 	LOAD		R1		[GB+CURBUT]		; Get the CURBUT state
 	 AND		R1		STARTB			; See if the input at STARTB is high
-	 BNE		ToScanning				; If it is, go to ToScanning
-	 BRA		IdlePaused				; Otherwise, keep looping
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Scanning states		;
-; All states while turning CCW	;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-ToScanning:
-	LOAD		R4		[GB+ABORT]		; Get the abort state
-	 BNE		Abort					; Branch if we aborted
+	 BEQ		IdlePaused				; If it's not, then keep looping
 	LOAD		R0		ON			; Get the ON binary value
 	STOR		R0		[GB+STATE+LPROXB]	; SET LPROXB on
 	STOR		R0		[GB+STATE+LPROXW]	; SET LPROXW on
 	STOR		R0		[GB+STATE+LCOLOR]	; SET LCOLOR on
 	 BRS		LightSwitch				; Wait for them to be on
+	 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Scanning states		;
+; All states while scanning	;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Scanning:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
-	 BRS		LightSwitch				; Run another LightSwitch				; To-Do: I think this is not necessary and only adds more delay
 	LOAD		R1		[R5+INPUT]		; Get the current input
 	 AND		R1		PROXE			; And see if PROXE is high
 	 BNE		Finished				; If it is, we go to Finished
