@@ -1,8 +1,9 @@
 @DATA
 	ERROR		DS	1		; HEXERRORCODE
+       CERROR		DS	1		; COLORHEXERRORCODE
        BUTBUF		DS	1		; the previous button input
        CURBUT		DS	1		;
-	DELTA		DW	10		; value for timer delay
+	DELTA		DW	1		; value for timer delay
 	 STEP		DW	0		; current step, for PWM
 	  PWM		DW	3		; max value for PWM
 	MOTOR		DS	1		; variable for motor state
@@ -12,6 +13,9 @@
        LTIMER		DW	0		; variable for the empty detector
        BLACKE		DW	0		; for when disks do a flip
        WHITEE		DW	0		; for when disks do a flip
+       DIGITS		DS	6		; binary patterns for display
+       CDIGIT		DS	1		; number of the next digit
+       NDIGIT		DS	1		; binary pattern for next digit
 
 @CODE
 
@@ -45,7 +49,7 @@
      	  OFF		EQU	%00		; Binary off
       
         BLACK		EQU	%010101000	; colordet 168 for black
-        ETIME		EQU	170		; 11 ms marge van 1590
+        ETIME		EQU	1700		; 11 ms marge van 1590
         
        HEXOFF		EQU	%00000000
          HEXE		EQU	%01001111
@@ -77,13 +81,10 @@ TimerISR:
 	 BRS		AbortCheck				; Checking if the abort button has been pressed
 	 BRS		StopCheck				; Checking if the stop button has been pressed
 	 BRS		LightTimerDecrease			; Decrease for the timer of the color detector light
+	 BRS		UpdateDisplay				; Subroutine for updating the display
 	 BRS		Output					; Subroutine for the outputs
 	SETI		8
 	 RTE
-	 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	Timer Interupt Subs	;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Abort and Pause Check	;
@@ -121,7 +122,41 @@ LightTimerDecrease:
 	 SUB		R0		1
 	STOR		R0		[GB+LTIMER]
 	 RTS
-	 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Display			;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+UpdateDisplay:
+	LOAD		R0		[GB+CDIGIT]
+	 CMP		R0		5			; Right most test
+	 BEQ		UpdateFinalDigit			; IF so THEN proceed with digit 5 ELSE
+
+UpdateDigit:
+	LOAD		R1		R0			; proceed with digits 0..4
+	 ADD		R1		DIGITS			; R1 := offset(DIGITS[CDIGIT])
+	LOAD		R1		[GB+R1]			; R1 := DIGITS[CDIGIT]
+	STOR		R1		[R5+DSPSEG]		; display the pattern on the next digit
+	 ADD		R0		1
+	STOR		R0		[GB+CDIGIT]		; CDIGIT := CDIGIT + 1
+	LOAD		R0		[GB+NDIGIT]
+	STOR		R0		[R5+DSPDIG]		; activate next display element
+	 ADD		R0		R0
+	STOR		R0		[GB+NDIGIT]		; NDIGIT := NDIGIT * 2
+	 RTS
+
+UpdateFinalDigit:
+ 	LOAD		R1		[GB+DIGITS+5]		; special case: digit 5
+	STOR		R1		[R5+DSPSEG]		; display the pattern on the next digit
+	LOAD		R0		0
+	STOR		R0		[GB+CDIGIT]		; CDIGIT := 0
+	LOAD		R0		[GB+NDIGIT]
+	STOR		R0		[R5+DSPDIG]		; activate next display element
+	LOAD		R0		1
+	STOR		R0		[GB+NDIGIT]		; NDIGIT := 1
+	 RTS
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Output			;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -304,6 +339,20 @@ Scanning:
 	 BNE		Finished
 	LOAD		R1		[R5+ADCONVS]
 	DVMD		R1		256
+	
+	DVMD		R2		10			; Stel R2 = 168 -> R2 16, R3 8
+	LOAD		R0		R3			; R0 := R3
+	 BRS		Hex2Seg7				; 
+	STOR		R1		[GB+DIGITS+0]
+	DVMD		R2		10			; R2 = 1, R3 = 6
+	LOAD		R0		R3
+	 BRS		Hex2Seg7
+	STOR		R1		[GB+DIGITS+1]
+	DVMD		R2		10
+	LOAD		R0		R3
+	 BRS		Hex2Seg7
+	STOR		R1		[GB+DIGITS+2]
+	
 	 CMP		R2		BLACK
 	 BPL		TurnBlack
 	 BRA		TurnWhite
@@ -317,6 +366,9 @@ TurnBlack:
 	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCW			; Load the CW value
 	STOR		R2		[GB+MOTOR]		; Make the motor rotate CW
+	
+	LOAD		R2		%011111111
+	STOR		R2		[GB+CERROR]
 	
 TurnBlack1:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -363,6 +415,9 @@ TurnWhite:
 	 BRS		LightSwitchProx
 	LOAD		R2		MOTORCCW		; Load the CCW value
 	STOR		R2		[GB+MOTOR]		; Make the motor rotate CCW
+	
+	LOAD		R2		%01001111
+	STOR		R2		[GB+CERROR]
 	
 TurnWhite1:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
@@ -426,33 +481,41 @@ FlipErrorW:
 	 BRA		Idle
 	
 AbortS1:
+	LOAD		R0		%0001
+	STOR		R0		[R5+LEDS]
 	LOAD		R0		HEX1
 	STOR		R0		[GB+ERROR]
 	 BRA		AbortLoop
 
 AbortS2:
+	LOAD		R0		%0010
+	STOR		R0		[R5+LEDS]
 	LOAD		R0		HEX2
 	STOR		R0		[GB+ERROR]
 	 BRA		AbortLoop
 
 AbortPROXB:
+	LOAD		R0		%0011
+	STOR		R0		[R5+LEDS]
 	LOAD		R0		HEX3
 	STOR		R0		[GB+ERROR]
 	 BRA		AbortLoop
 
 AbortPROXW:
+	LOAD		R0		%0100
+	STOR		R0		[R5+LEDS]
 	LOAD		R0		HEX4
 	STOR		R0		[GB+ERROR]
 	 BRA		AbortLoop
 	
 Abort:
+	LOAD		R0		%0101
+	STOR		R0		[R5+LEDS]
 	LOAD		R0		HEX0
 	STOR		R0		[GB+ERROR]
 	 BRA		AbortLoop
 
 AbortLoop:
-	LOAD		R0		%0111
-	STOR		R0		[R5+LEDS]
 	LOAD		R4		0
 	STOR		R4		[GB+ABORT]
 	LOAD		R0		OFF
@@ -461,32 +524,28 @@ AbortLoop:
 	STOR		R0		[GB+STATE+LCOLOR]
 	LOAD		R2		MOTOROFF
 	STOR		R2		[GB+MOTOR]
-	LOAD		R1		5
-	LOAD		R0		HEXE
-	STOR		R0		[R5+DSPSEG]
-	STOR		R1		[R5+DSPDIG]
-	 SUB		R1		1
-	LOAD		R0		HEXR
-	STOR		R0		[R5+DSPSEG]
-	STOR		R1		[R5+DSPDIG]
-	 SUB		R1		1
-	LOAD		R0		HEXR
-	STOR		R0		[R5+DSPSEG]
-	STOR		R1		[R5+DSPDIG]
-	 SUB		R1		1
-	LOAD		R0		HEX0
-	STOR		R0		[R5+DSPSEG]
-	STOR		R1		[R5+DSPDIG]
-	 SUB		R1		1
 	LOAD		R0		[GB+ERROR]
-	STOR		R0		[R5+DSPSEG]
-	STOR		R1		[R5+DSPDIG]
+	STOR		R0		[GB+DIGITS+5]
+	LOAD		R0		[GB+CERROR]
+	STOR		R0		[GB+DIGITS+4]
+	LOAD		R0		HEXE
+	STOR		R0		[GB+DIGITS+2]
+	LOAD		R0		HEXR
+	STOR		R0		[GB+DIGITS+1]
+	STOR		R0		[GB+DIGITS+0]
 	 BRS		ButtonCheck
 	LOAD		R1		[GB+CURBUT]
 	 AND		R1		STARTB
 	 BEQ		AbortLoop
+	LOAD		R0		%0000
+	STOR		R0		[R5+LEDS]
 	LOAD		R0		HEXOFF
-	STOR		R0		[R5+DSPSEG]
+	STOR		R0		[GB+DIGITS+0]
+	STOR		R0		[GB+DIGITS+1]
+	STOR		R0		[GB+DIGITS+2]
+	STOR		R0		[GB+DIGITS+3]
+	STOR		R0		[GB+DIGITS+4]
+	STOR		R0		[GB+DIGITS+5]
 	 BRA		Off
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -535,7 +594,42 @@ LightSwitchProxFinish:
 LightSwitchProxDone:
 	 RTS							; Subrouting for turning the prox detector light on, takes 1700 ticks to warm up
 
-	 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;      Display Converters	;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Hex2Seg7:
+	 BRS		Hex2Seg7_bgn
+
+Hex2Seg7_tbl:
+	CONS		%01111110				;  7-segment pattern for '0'
+	CONS		%00110000				;  7-segment pattern for '1'
+	CONS		%01101101				;  7-segment pattern for '2'
+	CONS		%01111001				;  7-segment pattern for '3'
+	CONS		%00110011				;  7-segment pattern for '4'
+	CONS		%01011011				;  7-segment pattern for '5'
+	CONS		%01011111				;  7-segment pattern for '6'
+	CONS		%01110000				;  7-segment pattern for '7'
+	CONS		%01111111				;  7-segment pattern for '8'
+	CONS		%01111011				;  7-segment pattern for '9'
+	CONS		%01110111				;  7-segment pattern for 'A'
+	CONS		%00011111				;  7-segment pattern for 'b'
+	CONS		%01001110				;  7-segment pattern for 'C'
+	CONS		%00111101				;  7-segment pattern for 'd'
+	CONS		%01001111				;  7-segment pattern for 'E'
+	CONS		%01000111				;  7-segment pattern for 'F'
+	CONS		%00000000				;  7-segment pattern for 'blank'
+
+Hex2Seg7_bgn:
+	 CMP		R0		16			; IF R0 < 16
+	 BCS		Hex2Seg7_fi				; THEN skip
+	LOAD		R0		16			; ELSE R0 := 16
+
+Hex2Seg7_fi:
+	LOAD		R1		[SP++]			; R1 := address(tbl) (pulled from stack)
+	LOAD		R1		[R1+R0]			; R1 := tbl[R0]
+	 RTS
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Button Checks		;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

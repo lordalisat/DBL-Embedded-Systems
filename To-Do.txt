@@ -1,1 +1,2 @@
 Optionally merge StopButCheck & But check
+Check if motor is disconnected (timeout)
