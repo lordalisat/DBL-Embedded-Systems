@@ -31,6 +31,7 @@
 	STATE		DS	3				; Variable for state LCOLOR:LPROXW:LPROXB
        PAUSED		DW	1				; Variable storing pause state
         ABORT		DW	0				; Variable storing abort state
+     FINISHED		DW	0				; Variable for finished state
 
        LTIMER		DW	0				; Variable for the empty detector
        BLACKE		DW	0				; For when disks do a flip
@@ -254,12 +255,16 @@ Off:
 Finished:
 	LOAD		R4		[GB+ABORT]		; Get the abort state
 	 BNE		Abort					; Branch if we aborted
+ 	LOAD		R2		MOTORCW			; Set R2 to MOTORCW
+	STOR		R2		[GB+MOTOR]		; And set it to rotate CW
+	LOAD		R4		[GB+FINISHED]		; Load the FINISHED value
+	 BEQ		EmptyCheck				; If zero, then go to EmptyCheck
+	LOAD		R4		0			; Set R4 to 0
+	STOR		R4		[GB+FINISHED]		; Store R4 to FINISHED
 	LOAD		R0		OFF			; Get the OFF value
 	STOR		R0		[GB+STATE+LPROXB]	; Set LPROXB off
 	STOR		R0		[GB+STATE+LPROXW]	; Set LPROXW off
 	STOR		R0		[GB+STATE+LCOLOR]	; Set LCOLOR off
-	LOAD		R2		MOTORCW			; Set R2 to MOTORCW
-	STOR		R2		[GB+MOTOR]		; And set it to rotate CW
 	 BRA		ToIdle1					; Then go to ToIdle1
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -367,7 +372,7 @@ IdlePausedInit:
 	LOAD		R1		[R5+INPUT]		; Get the input before turning LCOLOR off
 	STOR		R0		[GB+STATE+LCOLOR]	; Turn it off as well
 	 AND		R1		PROXE			; Check if PROXE is high
-	 BNE		IdlePaused				; If it is, go to IdlePaused
+	 BEQ		IdlePaused				; If it is, go to IdlePaused
 	LOAD		R2		MOTORCW			; Set R2 to MOTORCW value
 	STOR		R2		[GB+MOTOR]		; Set the MOTOR to use R2
 	 BRA		ToIdle1					; Go back to ToIdle1
@@ -379,12 +384,14 @@ IdlePaused:
 	LOAD		R1		[GB+CURBUT]		; Get the CURBUT state
 	 AND		R1		STARTB			; See if the input at STARTB is high
 	 BEQ		IdlePaused				; If it's not, then keep looping
+	LOAD		R0		0			; Set R0 to 0
+	STOR		R0		[GB+PAUSED]		; Reset R0 to 0
 	LOAD		R0		ON			; Get the ON binary value
 	STOR		R0		[GB+STATE+LPROXB]	; SET LPROXB on
 	STOR		R0		[GB+STATE+LPROXW]	; SET LPROXW on
 	STOR		R0		[GB+STATE+LCOLOR]	; SET LCOLOR on
 	 BRS		LightSwitch				; Wait for them to be on
-	 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Scanning states		;
 ; All states while scanning	;
@@ -396,6 +403,8 @@ Scanning:
 	LOAD		R1		[R5+INPUT]		; Get the current input
 	 AND		R1		PROXE			; And see if PROXE is high
 	 BNE		Finished				; If it is, we go to Finished
+	LOAD		R4		0			; Set R4 to 0
+	STOR		R4		[GB+FINISHED]		; Store R4 to FINISHED
 	LOAD		R1		[R5+ADCONVS]		; Get the color value
 	DVMD		R1		256			; Get the modulo 256 value
 	LOAD		R4		R2			; Temporarily store this in R4
@@ -416,6 +425,25 @@ Scanning:
 	 CMP		R4		BLACK			; Now compare stored R4 with BLACK
 	 BPL		TurnBlack				; If BLACK < R4 go to TurnBlack
 	 BRA		TurnWhite				; Otherwise, go to TurnWhite
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	EmptyCheck states	;
+; All states while empty	;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+EmptyCheck:
+	LOAD		R4		[GB+ABORT]		; Get the abort state
+	 BNE		Abort					; Branch if we aborted
+	LOAD		R4		1			; Set R4 to 1
+	STOR		R4		[GB+FINISHED]		; Store R4 into FINISHED
+	 BRS		ButtonCheck				; Get the button state
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S1			; Check if S1 is high
+	 BNE		AbortB					; If it is, abort
+	LOAD		R1		[GB+CURBUT]		; Load the values
+	 AND		R1		S2			; Check if S2 is high
+	 BNE		IdleCheck				; If it is, go to IdleCheck
+	 BRA		EmptyCheck				; Loop through EmptyCheck
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	Black disk states	;
@@ -590,6 +618,11 @@ Abort9:
 
 AbortA:
 	LOAD		R0		HEXA			; Set R0 := HEXA
+	STOR		R0		[GB+ERROR]		; Store it in ERROR
+	 BRA		AbortLoop				; Go to the AbortLoop
+	 
+ AbortB:
+	LOAD		R0		HEXB			; Set R0 := HEXA
 	STOR		R0		[GB+ERROR]		; Store it in ERROR
 	 BRA		AbortLoop				; Go to the AbortLoop
 
