@@ -51,20 +51,20 @@
         INPUT		EQU	7				; The 8 inputs
       ADCONVS		EQU	6				; The outputs, concatenated, of the 2 A/D-converters
 
-       LCOLOR		EQU	2				; Location of ColorDetLight in the state
-       LPROXW		EQU	1				; Location of ProxLightW in the state
-       LPROXB		EQU	0				; Location of ProxLightB in the state
+       LCOLOR		EQU	2				; Location of ColorDetLight in the state (Output 2)
+       LPROXW		EQU	1				; Location of ProxLightW in the state (Output 1)
+       LPROXB		EQU	0				; Location of ProxLightB in the state (Output 0)
 
         BLACK		EQU	179				; The value above which a disk is black
         ETIME		EQU	1800				; Delay for turning on lights (margin of 20 ms from 1600)
 
-       ABORTB		EQU	%000000001			; Location of the Abort button
-       STARTB		EQU	%000000010			; Location of the Start/Stop button
-	   S1		EQU	%000001000			; Location of S1
-	   S2		EQU	%000010000			; Location of S2
-	PROXB		EQU	%000100000			; Location of PROXB
-	PROXW		EQU	%001000000			; Location of PROXW
-	PROXE		EQU	%010000000			; Location of PROXE
+       ABORTB		EQU	%000000001			; Location of the Abort button (Input 0)
+       STARTB		EQU	%000000010			; Location of the Start/Stop button (Input 1)
+	   S1		EQU	%000001000			; Location of S1 (Input 3)
+	   S2		EQU	%000010000			; Location of S2 (Input 4)
+	PROXB		EQU	%000100000			; Location of PROXB (Input 5)
+	PROXW		EQU	%001000000			; Location of PROXW (Input 6)
+	PROXE		EQU	%010000000			; Location of PROXE (Input 7)
 
      	   ON		EQU	%01				; Binary on
      	  OFF		EQU	%00				; Binary off
@@ -620,8 +620,8 @@ AbortA:
 	LOAD		R0		HEXA			; Set R0 := HEXA
 	STOR		R0		[GB+ERROR]		; Store it in ERROR
 	 BRA		AbortLoop				; Go to the AbortLoop
-	 
- AbortB:
+
+AbortB:
 	LOAD		R0		HEXB			; Set R0 := HEXA
 	STOR		R0		[GB+ERROR]		; Store it in ERROR
 	 BRA		AbortLoop				; Go to the AbortLoop
